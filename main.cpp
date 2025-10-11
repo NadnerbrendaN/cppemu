@@ -6,8 +6,7 @@
  *  to obtain a copy of the license text.
 */
 
-#include <vector>
+int registers[16];
+bool flags[4];
 
-std::vector<int> program_memory;
-std::vector<int> working_memory;
-
+int add(bool s, short cond, int* rd, int* rn)
