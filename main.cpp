@@ -9,4 +9,17 @@
 int registers[16];
 bool flags[4];
 
-int add(bool s, short cond, int* rd, int* rn)
+int add(bool s, short cond, int* rn, int* op2) {
+    flags[3] = ((*rn < 0) == (*op2 < 0) && (b > 0 && a > std::numeric_limits<int_type>::max() - b
+                || b < 0 && a < std::numeric_limits<int_type>::min() - b));
+    int res = 0;
+    if (!flags[3]) {
+        res = *rn + *op2;
+    } else {
+        
+    }
+    if (s) {
+        flags[0] = res < 0;
+        flags[1] = res == 0;
+    }
+}
