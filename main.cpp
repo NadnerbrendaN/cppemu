@@ -8,15 +8,16 @@
 */
 
 #include <limits>
+#include <cstdint>
 #include <iostream>
 
-unsigned int registers[16]; // 16 32-bit registers
+std::uint32_t registers[16]; // 16 32-bit registers
 bool N = false; // Negative
 bool Z = false; // Zero
 bool C = false; // Carry
 bool V = false; // oVerflow
 
-bool check(short cond) { // check if the given condition should execute based on the status of our flags
+bool check(std::uint16_t cond) { // check if the given condition should execute based on the status of our flags
     switch (cond) {
         case 0: // AL -- always execute
             return true;
@@ -53,22 +54,48 @@ bool check(short cond) { // check if the given condition should execute based on
     }
 }
 
-unsigned int add(bool s, unsigned int* rn, unsigned int* op2) { // ADD
+void add(bool s, std::uint16_t cond, std::uint32_t* rd, std::uint32_t* rn, std::uint32_t* op2) { // ADD
+    if (!check(cond)) {
+        return;
+    }
     int res = 0;
     res = *rn + *op2; // add the values -- overflow is defined because it's unsigned
     if (s) { // should we set the condition flags?
         N = res < 0;
         Z = res == 0;
-        C = (*op2 > 0 && *rn > std::numeric_limits<unsigned int>::max() - *op2);
+        C = (*op2 > 0 && *rn > std::numeric_limits<std::uint32_t>::max() - *op2);
         V = C;
     }
-    return res;
+    *rd = res;
+}
+
+void adc(bool s, std::uint16_t cond, std::uint32_t* rd, std::uint32_t* rn, std::uint32_t* op2) { // ADC
+    if (!check(cond)) {
+        return;
+    }
+    int res = 0;
+    res = *rn + *op2;
+    if (C) {
+        ++res;
+    }
+    if (s) {
+        N = res < 0;
+        Z = res == 0;
+        C = (*rn > std::numeric_limits<std::uint32_t>::max() - *op2 - (C? 1:0));
+        V = C;
+    }
+    *rd = res;
 }
 
 int main() {
-    registers[0] = 255;
-    registers[1] = 1;
-    std::cout << add(false, &registers[0], &registers[1]);
+    registers[1] = std::numeric_limits<std::uint32_t>::max();
+    registers[2] = 1;
+    add(true, 0, &registers[0], &registers[1], &registers[2]);
+    std::cout << registers[0] << "\n";
+
+    registers[1] = std::numeric_limits<std::uint32_t>::max() - 1;
+    adc(false, 0, &registers[0], &registers[1], &registers[2]);
+    std::cout << registers[0] << "\n";
 
     return 0;
 }
