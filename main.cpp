@@ -11,91 +11,108 @@
 #include <cstdint>
 #include <iostream>
 
-std::uint32_t registers[16]; // 16 32-bit registers
-bool N = false; // Negative
-bool Z = false; // Zero
-bool C = false; // Carry
-bool V = false; // oVerflow
+struct State {
+    std::uint32_t reg[16]; // 16 32-bit registers
+    bool N = false; // Negative
+    bool Z = false; // Zero
+    bool C = false; // Carry
+    bool V = false; // oVerflow
+};
 
-bool check(std::uint16_t cond) { // check if the given condition should execute based on the status of our flags
+bool check(State& state, std::uint8_t cond) { // check if the given condition should execute based on the status of flags
     switch (cond) {
-        case 0: // AL -- always execute
+        case 0: // EQ -- equal to 0
+            return state.Z;
+        case 1: // NE -- not equal to 0
+            return !state.Z;
+        case 2: // CS or HS -- C set / Higher or same
+            return state.C;
+        case 3: // CC or LO -- C clear / Lower
+            return !state.C;
+        case 4: // MI -- Minus
+            return state.N;
+        case 5: // PL -- Plus
+            return !state.N;
+        case 6: // VS -- V set
+            return state.V;
+        case 7: // VC -- V clear
+            return !state.V;
+        case 8: // HI -- Higher
+            return state.C && !state.Z;
+        case 9: // LS -- Lower or same
+            return !state.C || state.Z;
+        case 10: // GE -- signed >=
+            return state.N == state.V;
+        case 11: // LT -- signed <
+            return state.N != state.V;
+        case 12: // GT -- signed >
+            return state.N == state.V && !state.Z;
+        case 13: // LE -- signed <=
+            return state.N != state.V && state.Z;
+        case 14: // AL -- always
             return true;
-        case 1: // EQ -- equal to 0
-            return Z;
-        case 2: // NE -- not equal to 0
-            return !Z;
-        case 3: // CS or HS -- C set / Higher or same
-            return C;
-        case 4: // CC or LO -- C clear / Lower
-            return !C;
-        case 5: // MI -- Minus
-            return N;
-        case 6: // PL -- Plus
-            return !N;
-        case 7: // VS -- V set
-            return V;
-        case 8: // VC -- V clear
-            return !V;
-        case 9: // HI -- Higher
-            return C && !Z;
-        case 10: // LS -- Lower or same
-            return !C || Z;
-        case 11: // GE -- signed >=
-            return N == V;
-        case 12: // LT -- signed <
-            return N != V;
-        case 13: // GT -- signed >
-            return N == V && !Z;
-        case 14: // LE -- signed <=
-            return N != V && Z;
         default:
-            return true;
+            return false;
     }
 }
 
-void add(bool s, std::uint16_t cond, std::uint32_t* rd, std::uint32_t* rn, std::uint32_t* op2) { // ADD
-    if (!check(cond)) {
+void add(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
+    if (!check(state, cond)) {
         return;
     }
-    int res = 0;
-    res = *rn + *op2; // add the values -- overflow is defined because it's unsigned
-    if (s) { // should we set the condition flags?
-        N = res < 0;
-        Z = res == 0;
-        C = (*op2 > 0 && *rn > std::numeric_limits<std::uint32_t>::max() - *op2);
-        V = C;
+    std::uint32_t res = state.reg[rn] + state.reg[rm];
+    if (s) { // set condition flags?
+        state.N = (res & 0x80000000) != 0; // check most significant bit
+        state.Z = res == 0;
+        state.C = (state.reg[rm] > 0
+                && state.reg[rn] > std::numeric_limits<std::uint32_t>::max() - state.reg[rm]);
+        state.V = state.C;
     }
-    *rd = res;
+    state.reg[rd] = res;
 }
 
-void adc(bool s, std::uint16_t cond, std::uint32_t* rd, std::uint32_t* rn, std::uint32_t* op2) { // ADC
-    if (!check(cond)) {
+void adc(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
+    if (!check(state, cond)) { // conditional execution
         return;
     }
-    int res = 0;
-    res = *rn + *op2;
-    if (C) {
+    if (rd == 15 || rn == 15 || rm == 15) { // avoid using PC
+        return;
+    }
+    std::uint32_t res = state.reg[rn] + state.reg[rm];
+    if (state.C) {
         ++res;
     }
     if (s) {
-        N = res < 0;
-        Z = res == 0;
-        C = (*rn > std::numeric_limits<std::uint32_t>::max() - *op2 - (C? 1:0));
-        V = C;
+        state.N = (res & 0x80000000) != 0;
+        state.Z = res == 0;
+        state.C = (state.reg[rn] >
+                (std::numeric_limits<std::uint32_t>::max() - state.reg[rm] - (state.C? 1:0)));
+        state.V = state.C;
     }
-    *rd = res;
+    state.reg[rd] = res;
+}
+
+void and(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
+    if (!check(state, cond)) {
+        return;
+    }
+    std::uint32_t res = (state.reg[rn] + rn==15?8:0) & state.reg[rm];
+    if (s) {
+        state.N = (res & 0x80000000) != 0;
+        state.Z = res == 0;
+        state.V = false;
+    }
 }
 
 int main() {
-    registers[1] = std::numeric_limits<std::uint32_t>::max();
-    registers[2] = 1;
-    add(true, 0, &registers[0], &registers[1], &registers[2]);
-    std::cout << registers[0] << "\n";
+    State state = {0};
+    state.reg[0] = 0;
+    state.reg[1] = 0x80000000;
+    add(state, true, 14, 2, 0, 1);
+    std::cout << state.reg[2] << "\n";
 
-    registers[1] = std::numeric_limits<std::uint32_t>::max() - 1;
-    adc(false, 0, &registers[0], &registers[1], &registers[2]);
-    std::cout << registers[0] << "\n";
+    add(state, false, 4, 3, 0, 1);
+    std::cout << state.reg[3] << "\n";
 
     return 0;
 }
