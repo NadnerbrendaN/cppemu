@@ -56,7 +56,7 @@ bool check(State& state, std::uint8_t cond) { // check if the given condition sh
     }
 }
 
-void add(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
+void ins_add(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
     if (!check(state, cond)) {
         return;
     }
@@ -71,7 +71,7 @@ void add(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
     state.reg[rd] = res;
 }
 
-void adc(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
+void ins_adc(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
     if (!check(state, cond)) { // conditional execution
         return;
     }
@@ -92,7 +92,7 @@ void adc(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
     state.reg[rd] = res;
 }
 
-void and(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
+void ins_and(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
     if (!check(state, cond)) {
         return;
     }
@@ -102,16 +102,34 @@ void and(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
         state.Z = res == 0;
         state.V = false;
     }
+    state.reg[rd] = res;
+}
+
+void ins_mov(State& state, bool s, std::uint8_t cond, int rd, int rn) {
+    if (!check(state, cond)) {
+        return;
+    }
+    if (s) {
+        state.N = (state.reg[rn] & 0x80000000) != 0;
+        state.Z = state.reg[rn] == 0;
+    }
+    state.reg[rd] = state.reg[rn];
+}
+
+void ins_mov(State& state, std::uint8_t cond, int rd, std::uint32_t value) {
+    if (!check(state, cond)) {
+        return;
+    }
+    state.reg[rd] = value;
 }
 
 int main() {
     State state = {0};
-    state.reg[0] = 0;
-    state.reg[1] = 0x80000000;
-    add(state, true, 14, 2, 0, 1);
+    ins_mov(state, 14, 1, 0x80000000);
+    ins_add(state, true, 4, 2, 0, 1);
     std::cout << state.reg[2] << "\n";
 
-    add(state, false, 4, 3, 0, 1);
+    ins_add(state, false, 4, 3, 0, 1);
     std::cout << state.reg[3] << "\n";
 
     return 0;
