@@ -61,11 +61,13 @@ void ins_add(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
         return;
     }
     std::uint32_t res = state.reg[rn] + state.reg[rm];
+    if (rn == 15 || rm == 15) {
+        res += 8;
+    }
     if (s) { // set condition flags?
         state.N = (res & 0x80000000) != 0; // check most significant bit
         state.Z = res == 0;
-        state.C = (state.reg[rm] > 0
-                && state.reg[rn] > std::numeric_limits<std::uint32_t>::max() - state.reg[rm]);
+        state.C = (res < state.reg[rn] || res < state.reg[rm]);
         state.V = state.C;
     }
     state.reg[rd] = res;
@@ -96,7 +98,7 @@ void ins_and(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
     if (!check(state, cond)) {
         return;
     }
-    std::uint32_t res = (state.reg[rn] + rn==15?8:0) & state.reg[rm];
+    std::uint32_t res = state.reg[rn] & state.reg[rm];
     if (s) {
         state.N = (res & 0x80000000) != 0;
         state.Z = res == 0;
@@ -125,12 +127,7 @@ void ins_mov(State& state, std::uint8_t cond, int rd, std::uint32_t value) {
 
 int main() {
     State state = {0};
-    ins_mov(state, 14, 1, 0x80000000);
-    ins_add(state, true, 4, 2, 0, 1);
-    std::cout << state.reg[2] << "\n";
 
-    ins_add(state, false, 4, 3, 0, 1);
-    std::cout << state.reg[3] << "\n";
 
     return 0;
 }
