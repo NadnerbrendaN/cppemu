@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2025 Luna Dock <lunadock@protonmail.com> 
+ * Copyright (C) 2025 NadnerbrendaN <albertdock@duck.com>
  *
  *  This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
  *  If you did not recieve a copy of the MPL-2.0 with this source code, please contact the author
