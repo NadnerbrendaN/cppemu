@@ -11,7 +11,7 @@
 #include <cstdint>
 #include <iostream>
 
-struct State {
+struct State { // current state of the CPU, etc
     std::uint32_t reg[16]; // 16 32-bit registers
     bool N = false; // Negative
     bool Z = false; // Zero
@@ -57,31 +57,31 @@ bool check(State& state, std::uint8_t cond) { // check if the given condition sh
 }
 
 void ins_add(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
-    if (!check(state, cond)) {
+    if (!check(state, cond)) { // if we shouldn't execute
         return;
     }
     std::uint32_t res = state.reg[rn] + state.reg[rm];
-    if (rn == 15 || rm == 15) {
+    if (rn == 15 || rm == 15) { // add 8 if either is PC -- TODO: confirm that's right
         res += 8;
     }
     if (s) { // set condition flags?
         state.N = (res & 0x80000000) != 0; // check most significant bit
         state.Z = res == 0;
-        state.C = (res < state.reg[rn] || res < state.reg[rm]);
+        state.C = (res < state.reg[rn] || res < state.reg[rm]); // carry -> if result of addition is less than one or more of the operands, we overflowed and thus carry
         state.V = state.C;
     }
     state.reg[rd] = res;
 }
 
 void ins_adc(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
-    if (!check(state, cond)) { // conditional execution
+    if (!check(state, cond)) {
         return;
     }
     if (rd == 15 || rn == 15 || rm == 15) { // avoid using PC
         return;
     }
     std::uint32_t res = state.reg[rn] + state.reg[rm];
-    if (state.C) {
+    if (state.C) { // carry if carry flag is set
         ++res;
     }
     if (s) {
@@ -89,6 +89,8 @@ void ins_adc(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
         state.Z = res == 0;
         state.C = (state.reg[rn] >
                 (std::numeric_limits<std::uint32_t>::max() - state.reg[rm] - (state.C? 1:0)));
+        // check if one register is greater than the difference between the 32-bit limit
+        // and the other register, accounting for carry if necessary
         state.V = state.C;
     }
     state.reg[rd] = res;
@@ -98,11 +100,12 @@ void ins_and(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
     if (!check(state, cond)) {
         return;
     }
-    std::uint32_t res = state.reg[rn] & state.reg[rm];
+    std::uint32_t res = state.reg[rn] & state.reg[rm]; // bitwise and
     if (s) {
         state.N = (res & 0x80000000) != 0;
         state.Z = res == 0;
         state.V = false;
+        // carry is unchanged, while overflow is set to false
     }
     state.reg[rd] = res;
 }
@@ -114,20 +117,40 @@ void ins_mov(State& state, bool s, std::uint8_t cond, int rd, int rn) {
     if (s) {
         state.N = (state.reg[rn] & 0x80000000) != 0;
         state.Z = state.reg[rn] == 0;
+        // neither carry nor overflow are changed
     }
-    state.reg[rd] = state.reg[rn];
+    state.reg[rd] = state.reg[rn]; // rd <- rn
 }
 
 void ins_mov(State& state, std::uint8_t cond, int rd, std::uint32_t value) {
     if (!check(state, cond)) {
         return;
     }
-    state.reg[rd] = value;
+    // no need to set flags, as the value is known
+    state.reg[rd] = value; // rd <- given immediate value
 }
 
 int main() {
-    State state = {0};
+    State state = {0}; // initialize all parts of state to default values (0, false, etc)
+    std::uint32_t len = 1; // # of instructions
+    std::uint32_t instructions[len] = {
+        0b00000000100100000000000000000001
+    };
 
+    while (state.reg[15] < len) { // ensure PC does not go over # of instructions
+        //std::cout << state.reg[15] << "\n";
+        std::uint32_t ins = instructions[0]; // isolate current instruction for easy later use
+        //std::cout << ins << "\n";
+        std::uint8_t cond = (ins >> 28) & 0b1111; // isolate bits 28-31, which are the condition
+        //std::cout << (int)(cond) << "\n";
+        if (cond != 0b1111 && (ins >> 26 & 0b11) == 0) { // data processing instructions (bits 26&27 are 00)
+            if ((ins >> 26 & 0b1) == 0) { // check op0
+
+            }
+        }
+
+        ++state.reg[15]; // increment PC
+    }
 
     return 0;
 }
