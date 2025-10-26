@@ -134,7 +134,7 @@ int main() {
     State state = {0}; // initialize all parts of state to default values (0, false, etc)
     std::uint32_t len = 1; // # of instructions
     std::uint32_t instructions[len] = {
-        0b00000000100100000000000000000001
+        0b00000000100100000000000000010001
     };
 
     while (state.reg[15] < len) { // ensure PC does not go over # of instructions
@@ -144,8 +144,11 @@ int main() {
         std::uint8_t cond = (ins >> 28) & 0b1111; // isolate bits 28-31, which are the condition
         //std::cout << (int)(cond) << "\n";
         if (cond != 0b1111 && (ins >> 26 & 0b11) == 0) { // data processing instructions (bits 26&27 are 00)
-            if ((ins >> 26 & 0b1) == 0) { // check op0
-
+            if ((ins >> 26 & 0b1) == 0) { // check op0 bit 1 in general instructions
+                if ((ins >> 4 & 0b1) == 0) {// check op4 in general instructions
+                    if ((ins >> 24 & 0b1) == 0) {// check op0 bit 1 in DP
+                    }
+                }
             }
         }
 
