@@ -12,6 +12,7 @@
 #include <iostream>
 
 struct State { // current state of the CPU, etc
+    bool debug = false;
     std::uint32_t reg[16]; // 16 32-bit registers
     bool N = false; // Negative
     bool Z = false; // Zero
@@ -56,7 +57,7 @@ bool check(State& state, std::uint8_t cond) { // check if the given condition sh
     }
 }
 
-void ins_add(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
+void ins_add(State& state, bool s, std::uint8_t cond, std::uint8_t rd, std::uint8_t rn, std::uint8_t rm) {
     if (!check(state, cond)) { // if we shouldn't execute
         return;
     }
@@ -73,7 +74,7 @@ void ins_add(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
     state.reg[rd] = res;
 }
 
-void ins_adc(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
+void ins_adc(State& state, bool s, std::uint8_t cond, std::uint8_t rd, std::uint8_t rn, std::uint8_t rm) {
     if (!check(state, cond)) {
         return;
     }
@@ -96,7 +97,7 @@ void ins_adc(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
     state.reg[rd] = res;
 }
 
-void ins_and(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
+void ins_and(State& state, bool s, std::uint8_t cond, std::uint8_t rd, std::uint8_t rn, std::uint8_t rm) {
     if (!check(state, cond)) {
         return;
     }
@@ -110,7 +111,7 @@ void ins_and(State& state, bool s, std::uint8_t cond, int rd, int rn, int rm) {
     state.reg[rd] = res;
 }
 
-void ins_mov(State& state, bool s, std::uint8_t cond, int rd, int rn) {
+void ins_mov(State& state, bool s, std::uint8_t cond, std::uint8_t rd, std::uint8_t rn) {
     if (!check(state, cond)) {
         return;
     }
@@ -122,7 +123,7 @@ void ins_mov(State& state, bool s, std::uint8_t cond, int rd, int rn) {
     state.reg[rd] = state.reg[rn]; // rd <- rn
 }
 
-void ins_mov(State& state, std::uint8_t cond, int rd, std::uint32_t value) {
+void ins_mov(State& state, std::uint8_t cond, std::uint8_t rd, std::uint32_t value) {
     if (!check(state, cond)) {
         return;
     }
@@ -130,26 +131,53 @@ void ins_mov(State& state, std::uint8_t cond, int rd, std::uint32_t value) {
     state.reg[rd] = value; // rd <- given immediate value
 }
 
-int main() {
-    State state = {0}; // initialize all parts of state to default values (0, false, etc)
-    std::uint32_t len = 1; // # of instructions
-    std::uint32_t instructions[len] = {
-        0b00000000100100000000000000010001
-    };
+void debug_mode(State& state) {
+    std::cout << "Registers:\n";
+    for (std::uint8_t i = 0; i < 16; ++i) {
+        std::cout << std::hex << (int)i << ": " << state.reg[i] << '\n';
+    }
+}
 
-    while (state.reg[15] < len) { // ensure PC does not go over # of instructions
-        //std::cout << state.reg[15] << "\n";
-        std::uint32_t ins = instructions[0]; // isolate current instruction for easy later use
-        //std::cout << ins << "\n";
-        std::uint8_t cond = (ins >> 28) & 0b1111; // isolate bits 28-31, which are the condition
-        //std::cout << (int)(cond) << "\n";
-        if (cond != 0b1111 && (ins >> 26 & 0b11) == 0) { // data processing instructions (bits 26&27 are 00)
-            if ((ins >> 26 & 0b1) == 0) { // check op0 bit 1 in general instructions
-                if ((ins >> 4 & 0b1) == 0) {// check op4 in general instructions
-                    if ((ins >> 24 & 0b1) == 0) {// check op0 bit 1 in DP
+void parse_instruction(State& state, std::uint32_t ins) {
+    std::uint8_t cond = (ins >> 28) & 0b1111; // isolate bits 28-31, which are the condition
+    if (cond != 0b1111 && (ins >> 26 & 0b11) == 0) { // data processing instructions (bits 26&27 are 00)
+        if ((ins >> 26 & 0b1) == 0) { // check op0 bit 1 in DP instructions
+            if ((ins >> 4 & 0b1) == 0) {// check op4 in DP instructions
+                if ((ins >> 24 & 0b1) == 0) {// check op0 bit 1 in DP-R
+                    if ((ins >> 21 & 0b111) == 0b100 && (ins >> 16 & 0b1111) != 1101) { // OPC=ADD & !SP
+                        bool s = ins >> 20 == 1;
+                        std::uint8_t rd = (ins >> 12 & 0b1111);
+                        std::uint8_t rn = (ins >> 16 & 0b1111);
+                        std::uint8_t rm = (ins & 0b1111);
+                        ins_add(state, s, cond, rd, rn, rm);
                     }
                 }
             }
+        }
+    }
+}
+
+int main(int argc, char** argv) {
+    State state = {0}; // initialize all parts of state to default values (0, false, etc)
+    state.reg[1] = 0xFF;
+    std::uint32_t len = 3; // # of instructions
+    std::uint32_t instructions[len] = {
+        0b1110'0000'1001'0000'0000'0000'0000'0001, // 0000 = 0000 + 0001
+        0b1110'0000'1001'0000'0000'0000'0000'0001, // 0000 = 0000 + 0001
+        0b1110'0000'1001'0000'0000'0000'0000'0001, // 0000 = 0000 + 0001
+    };
+
+    if (argc > 1 && argv[1][0] == 'd') {
+        std::cout << "Debug mode active.\n";
+        state.debug = true;
+        debug_mode(state);
+    }
+
+    while (state.reg[15] < len) { // ensure PC does not go over # of instructions
+        std::uint32_t ins = instructions[state.reg[15]]; // isolate current instruction for easy later use
+        parse_instruction(state, ins);
+        if (state.debug) {
+            debug_mode(state);
         }
 
         ++state.reg[15]; // increment PC
