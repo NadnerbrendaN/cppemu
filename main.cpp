@@ -68,7 +68,9 @@ void ins_add(State& state, bool s, std::uint8_t cond, std::uint8_t rd, std::uint
     if (s) { // set condition flags?
         state.N = (res & 0x80000000) != 0; // check most significant bit
         state.Z = res == 0;
-        state.C = (res < state.reg[rn] || res < state.reg[rm]); // carry -> if result of addition is less than one or more of the operands, we overflowed and thus carry
+        state.C = (res < state.reg[rn] || res < state.reg[rm]);
+        // carry -> if result of addition is less than one or more of the operands,
+        // we overflowed and thus carry
         state.V = state.C;
     }
     state.reg[rd] = res;
@@ -141,7 +143,7 @@ void debug_mode(State& state) {
 void parse_instruction(State& state, std::uint32_t ins) {
     std::uint8_t cond = (ins >> 28) & 0b1111; // isolate bits 28-31, which are the condition
     if (cond != 0b1111 && (ins >> 26 & 0b11) == 0) { // data processing instructions (bits 26&27 are 00)
-        if ((ins >> 26 & 0b1) == 0) { // check op0 bit 1 in DP instructions
+        if ((ins >> 25 & 0b1) == 0) { // check op0 in DP instructions
             if ((ins >> 4 & 0b1) == 0) {// check op4 in DP instructions
                 if ((ins >> 24 & 0b1) == 0) {// check op0 bit 1 in DP-R
                     if ((ins >> 21 & 0b111) == 0b100 && (ins >> 16 & 0b1111) != 1101) { // OPC=ADD & !SP
@@ -150,11 +152,33 @@ void parse_instruction(State& state, std::uint32_t ins) {
                         std::uint8_t rn = (ins >> 16 & 0b1111);
                         std::uint8_t rm = (ins & 0b1111);
                         ins_add(state, s, cond, rd, rn, rm);
+                    } else if ((ins >> 21 & 0b111) == 0b101) { // OPC=ADC
+                        bool s = ins >> 20 == 1;
+                        std::uint8_t rd = (ins >> 12 & 0b1111);
+                        std::uint8_t rn = (ins >> 16 & 0b1111);
+                        std::uint8_t rm = (ins & 0b1111);
+                        ins_adc(state, s, cond, rd, rn, rm);
+                    } else if ((ins >> 21 & 0b111) == 0) { // OPC==AND
+                        bool s = ins >> 20 == 1;
+                        std::uint8_t rd = (ins >> 12 & 0b1111);
+                        std::uint8_t rn = (ins >> 16 & 0b1111);
+                        std::uint8_t rm = (ins & 0b1111);
+                        ins_and(state, s, cond, rd, rn, rm);
                     }
                 }
             }
         }
+    } else if ((ins >> 26 & 0b11) == 0b10) { // branch, bwl, bdt
+        if ((ins >> 25 & 0b1) == 1) { // branch (immediate)
+            if (cond != 0b1111 && (ins >> 24 & 0b1) == 0) { // B
+                //std::int32_t relative_
+            }
+        }
     }
+}
+
+std::int32_t sign_extend(std::int32_t x) {
+    return static_cast<int32_t> x;
 }
 
 int main(int argc, char** argv) {
@@ -167,6 +191,8 @@ int main(int argc, char** argv) {
         0b1110'0000'1001'0000'0000'0000'0000'0001, // 0000 = 0000 + 0001
     };
 
+    std::cout << sign_extend(0xff, 32, 8) << '\n';
+
     if (argc > 1 && argv[1][0] == 'd') {
         std::cout << "Debug mode active.\n";
         state.debug = true;
@@ -175,12 +201,12 @@ int main(int argc, char** argv) {
 
     while (state.reg[15] < len) { // ensure PC does not go over # of instructions
         std::uint32_t ins = instructions[state.reg[15]]; // isolate current instruction for easy later use
+        ++state.reg[15]; // increment PC
         parse_instruction(state, ins);
         if (state.debug) {
             debug_mode(state);
         }
 
-        ++state.reg[15]; // increment PC
     }
 
     return 0;
