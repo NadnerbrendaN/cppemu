@@ -1,8 +1,10 @@
 /*
  * Copyright (C) 2025 NadnerbrendaN <albertdock@duck.com>
+ * 
+ * An ARM emulator that doesn't work
  *
  *  This Source Code Form is subject to the terms of the Mozilla Public License, v. 2.0.
- *  If you did not recieve a copy of the MPL-2.0 with this source code, please contact the author
+ *  If you did not receive a copy of the MPL-2.0 with this source code, please contact the author
  *  to report the issue, and visit https://www.mozilla.org/media/MPL/2.0/index.f75d2927d3c1.txt
  *  to obtain a copy of the license text.
 */
@@ -69,8 +71,7 @@ void ins_add(State& state, bool s, std::uint8_t cond, std::uint8_t rd, std::uint
         state.N = (res & 0x80000000) != 0; // check most significant bit
         state.Z = res == 0;
         state.C = (res < state.reg[rn] || res < state.reg[rm]);
-        // carry -> if result of addition is less than one or more of the operands,
-        // we overflowed and thus carry
+        // carry -> if result of addition is less than one or more of the operands, we overflowed and thus carry
         state.V = state.C;
     }
     state.reg[rd] = res;
@@ -90,10 +91,8 @@ void ins_adc(State& state, bool s, std::uint8_t cond, std::uint8_t rd, std::uint
     if (s) {
         state.N = (res & 0x80000000) != 0;
         state.Z = res == 0;
-        state.C = (state.reg[rn] >
-                (std::numeric_limits<std::uint32_t>::max() - state.reg[rm] - (state.C? 1:0)));
-        // check if one register is greater than the difference between the 32-bit limit
-        // and the other register, accounting for carry if necessary
+        state.C = (state.reg[rn] > (std::numeric_limits<std::uint32_t>::max() - state.reg[rm] - (state.C? 1:0)));
+        // check if one register is greater than the difference between the 32-bit limit and the other register, accounting for carry if necessary
         state.V = state.C;
     }
     state.reg[rd] = res;
@@ -113,25 +112,7 @@ void ins_and(State& state, bool s, std::uint8_t cond, std::uint8_t rd, std::uint
     state.reg[rd] = res;
 }
 
-void ins_mov(State& state, bool s, std::uint8_t cond, std::uint8_t rd, std::uint8_t rn) {
-    if (!check(state, cond)) {
-        return;
-    }
-    if (s) {
-        state.N = (state.reg[rn] & 0x80000000) != 0;
-        state.Z = state.reg[rn] == 0;
-        // neither carry nor overflow are changed
-    }
-    state.reg[rd] = state.reg[rn]; // rd <- rn
-}
-
-void ins_mov(State& state, std::uint8_t cond, std::uint8_t rd, std::uint32_t value) {
-    if (!check(state, cond)) {
-        return;
-    }
-    // no need to set flags, as the value is known
-    state.reg[rd] = value; // rd <- given immediate value
-}
+// TODO: Re-make move commands because they were almost entirely wrong I think
 
 void debug_mode(State& state) {
     std::cout << "Registers:\n";
